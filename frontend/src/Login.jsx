@@ -1,14 +1,53 @@
-export default function Login() {
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+export default function Login({ setToken }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("http://localhost:4000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        setToken(data.token); // update App state
+        navigate("/jobs"); // redirect to jobs
+      } else {
+        alert(data.error || "Login failed");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+    }
+  };
+
   return (
-    <div className="flex justify-center items-center h-screen">
-      <form className="flex flex-col w-72 gap-2.5">
-        <h2 className="text-3xl font-bold underline">Login</h2>
-        <input type="email" placeholder="Email" required className="border p-2 rounded" />
-        <input type="password" placeholder="Password" required className="border p-2 rounded" />
-        <button type="submit" className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-          Login
-        </button>
-      </form>
-    </div>
+    <form onSubmit={handleLogin}>
+      <h2>Login</h2>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+      <button type="submit">Login</button>
+    </form>
   );
 }

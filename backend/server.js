@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { authenticateToken } from "./middleware/auth.js";
 
 dotenv.config();
 
@@ -14,6 +15,10 @@ app.use(cors());
 app.use(express.json());
 
 const users = []; // For now, store users in-memory (replace with DB later)
+
+app.get('/users', (req, res) => {
+  res.json(users);
+});
 
 // Signup route
 app.post('/signup', async (req, res) => {
@@ -38,6 +43,16 @@ app.post('/login', async (req, res) => {
   // Create JWT token
   const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
   res.json({ token });
+});
+
+// Protected jobs route
+app.get("/jobs", authenticateToken, (req, res) => {
+  const jobs = [
+    { id: 1, title: "Frontend Developer", company: "Tech Corp" },
+    { id: 2, title: "Backend Engineer", company: "Code Labs" },
+    { id: 3, title: "Full Stack Developer", company: "Startup Hub" }
+  ];
+  res.json(jobs);
 });
 
 app.listen(PORT, () => console.log(`Auth server running on http://localhost:${PORT}`));
