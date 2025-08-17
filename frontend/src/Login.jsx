@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 export default function Login({ setToken }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -9,7 +8,7 @@ export default function Login({ setToken }) {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    try {
+    try { 
       const res = await fetch("http://localhost:4000/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

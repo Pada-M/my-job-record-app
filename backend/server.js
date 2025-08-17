@@ -14,13 +14,25 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-const users = []; // For now, store users in-memory (replace with DB later)
+// In-memory users
+const users = [];
 
+// Shared jobs array
+const jobs = [
+  { id: 1, title: "Frontend Developer", company: "Tech Corp" },
+  { id: 2, title: "Backend Engineer", company: "Code Labs" },
+  { id: 3, title: "Full Stack Developer", company: "Startup Hub" }
+];
+let idCounter = jobs.length + 1; // Next id starts after the initial jobs
+
+// --- Routes ---
+
+// Get all users (for testing)
 app.get('/users', (req, res) => {
   res.json(users);
 });
 
-// Signup route
+// Signup
 app.post('/signup', async (req, res) => {
   const { email, password } = req.body;
   const userExists = users.find(u => u.email === email);
@@ -31,7 +43,7 @@ app.post('/signup', async (req, res) => {
   res.status(201).json({ message: 'User created' });
 });
 
-// Login route
+// Login
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const user = users.find(u => u.email === email);
@@ -45,14 +57,18 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-// Protected jobs route
+// GET all jobs (protected)
 app.get("/jobs", authenticateToken, (req, res) => {
-  const jobs = [
-    { id: 1, title: "Frontend Developer", company: "Tech Corp" },
-    { id: 2, title: "Backend Engineer", company: "Code Labs" },
-    { id: 3, title: "Full Stack Developer", company: "Startup Hub" }
-  ];
   res.json(jobs);
 });
 
+// POST a new job (protected)
+app.post('/jobs', authenticateToken, (req, res) => {
+  const { title, company, description } = req.body;
+  const newJob = { id: idCounter++, title, company, description };
+  jobs.push(newJob);
+  res.status(201).json(newJob);
+});
+
+// Start server
 app.listen(PORT, () => console.log(`Auth server running on http://localhost:${PORT}`));
