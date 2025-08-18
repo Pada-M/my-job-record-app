@@ -17,17 +17,16 @@ app.use(express.json());
 // In-memory users
 const users = [];
 
-// Shared jobs array
+// Shared jobs array with status
 const jobs = [
-  { id: 1, title: "Frontend Developer", company: "Tech Corp" },
-  { id: 2, title: "Backend Engineer", company: "Code Labs" },
-  { id: 3, title: "Full Stack Developer", company: "Startup Hub" }
+  { id: 1, role: "Frontend Developer", company: "Tech Corp", description: "", status: "Open" },
+  { id: 2, role: "Backend Engineer", company: "Code Labs", description: "", status: "Open" },
+  { id: 3, role: "Full Stack Developer", company: "Startup Hub", description: "", status: "Open" }
 ];
 let idCounter = jobs.length + 1; // Next id starts after the initial jobs
 
 // --- Routes ---
 
-// Get all users (for testing)
 app.get('/users', (req, res) => {
   res.json(users);
 });
@@ -52,7 +51,6 @@ app.post('/login', async (req, res) => {
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
 
-  // Create JWT token
   const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
   res.json({ token });
 });
@@ -62,13 +60,48 @@ app.get("/jobs", authenticateToken, (req, res) => {
   res.json(jobs);
 });
 
-// POST a new job (protected)
 app.post('/jobs', authenticateToken, (req, res) => {
-  const { title, company, description } = req.body;
-  const newJob = { id: idCounter++, title, company, description };
+  const { role, company, description, status } = req.body;
+  const newJob = { id: idCounter++, role, company, description, status: status || "Open" };
   jobs.push(newJob);
   res.status(201).json(newJob);
 });
 
-// Start server
+// Update job status (protected)
+app.patch('/jobs/:id/status', authenticateToken, (req, res) => {
+  const jobId = parseInt(req.params.id);
+  const { status } = req.body;
+
+  const job = jobs.find((j) => j.id === jobId);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
+  job.status = status;
+  res.json(job);
+});
+
+app.delete('/jobs/:id', authenticateToken, (req, res) => {
+  const jobId = parseInt(req.params.id);
+  const index = jobs.findIndex(j => j.id === jobId);
+  if (index === -1) return res.status(404).json({ error: "Job not found" });
+
+  const deletedJob = jobs.splice(index, 1)[0];
+  res.json(deletedJob);
+});
+
+app.patch('/jobs/:id', authenticateToken, (req, res) => {
+  const jobId = parseInt(req.params.id);
+  const { role, company, description, status } = req.body;
+
+  const job = jobs.find(j => j.id === jobId);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
+  job.role = role ?? job.role;
+  job.company = company ?? job.company;
+  job.description = description ?? job.description;
+  job.status = status ?? job.status;
+
+  res.json(job);
+});
+
+
 app.listen(PORT, () => console.log(`Auth server running on http://localhost:${PORT}`));

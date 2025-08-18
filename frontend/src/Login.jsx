@@ -30,16 +30,18 @@ export default function Login({ setToken }) {
   };
 
   return (
-    <form onSubmit={handleLogin}>
+    <form onSubmit={handleLogin} id= "login-form">
       <h2>Login</h2>
       <input
         type="email"
+        id = "login-email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
       />
       <input
+        id = "login-password"
         type="password"
         placeholder="Password"
         value={password}
