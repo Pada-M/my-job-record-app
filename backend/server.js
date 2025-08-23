@@ -5,25 +5,25 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { authenticateToken } from "./middleware/auth.js";
+import pkg from 'pg';
 
 dotenv.config();
 
+const { Pool } = pkg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+pool.query("SELECT NOW()")
+  .then(res => console.log("DB connected:", res.rows[0]))
+  .catch(err => console.error("DB connection error:", err));
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
 
-// In-memory users
+// In-memory users (you can later move users to DB)
 const users = [];
-
-// Shared jobs array with status
-const jobs = [
-  { id: 1, role: "Frontend Developer", company: "Tech Corp", description: "", status: "Open" },
-  { id: 2, role: "Backend Engineer", company: "Code Labs", description: "", status: "Open" },
-  { id: 3, role: "Full Stack Developer", company: "Startup Hub", description: "", status: "Open" }
-];
-let idCounter = jobs.length + 1; // Next id starts after the initial jobs
 
 // --- Routes ---
 
@@ -55,53 +55,98 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-// GET all jobs (protected)
-app.get("/jobs", authenticateToken, (req, res) => {
-  res.json(jobs);
+// GET all jobs
+app.get("/jobs", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM jobs");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching jobs:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-app.post('/jobs', authenticateToken, (req, res) => {
-  const { role, company, description, status } = req.body;
-  const newJob = { id: idCounter++, role, company, description, status: status || "Open" };
-  jobs.push(newJob);
-  res.status(201).json(newJob);
+
+// POST a new job
+app.post("/jobs", authenticateToken, async (req, res) => {
+  try {
+    const { role, company, description, status, location, job_type, salary, tags } = req.body;
+
+    if (!role || !company) return res.status(400).json({ error: "Role and company required" });
+
+    const query = `
+      INSERT INTO jobs (role, company, description, status, location, job_type, salary, tags)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
+    `;
+    const values = [role, company, description || null, status || "Open", location || null, job_type || null, salary || null, tags || null];
+
+    const result = await pool.query(query, values);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Error posting job:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-// Update job status (protected)
-app.patch('/jobs/:id/status', authenticateToken, (req, res) => {
+
+// PATCH / update a job
+app.patch('/jobs/:id', authenticateToken, async (req, res) => {
   const jobId = parseInt(req.params.id);
-  const { status } = req.body;
+  if (isNaN(jobId)) return res.status(400).json({ error: "Invalid job ID" });
 
-  const job = jobs.find((j) => j.id === jobId);
-  if (!job) return res.status(404).json({ error: "Job not found" });
+  // Destructure only the fields we allow updating
+  const {
+    role,
+    company,
+    description,
+    status,
+    location,
+    job_type,
+    salary,
+    tags
+  } = req.body;
 
-  job.status = status;
-  res.json(job);
+  try {
+    const result = await pool.query(
+      `UPDATE jobs
+       SET role = COALESCE($1, role),
+           company = COALESCE($2, company),
+           description = COALESCE($3, description),
+           status = COALESCE($4, status),
+           location = COALESCE($5, location),
+           job_type = COALESCE($6, job_type),
+           salary = COALESCE($7, salary),
+           tags = COALESCE($8, tags),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $9
+       RETURNING *`,
+      [role, company, description, status, location, job_type, salary, tags, jobId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating job:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-app.delete('/jobs/:id', authenticateToken, (req, res) => {
+
+
+// DELETE a job
+app.delete('/jobs/:id', authenticateToken, async (req, res) => {
   const jobId = parseInt(req.params.id);
-  const index = jobs.findIndex(j => j.id === jobId);
-  if (index === -1) return res.status(404).json({ error: "Job not found" });
+  try {
+    const result = await pool.query("DELETE FROM jobs WHERE id=$1 RETURNING *", [jobId]);
+    if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
 
-  const deletedJob = jobs.splice(index, 1)[0];
-  res.json(deletedJob);
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
-
-app.patch('/jobs/:id', authenticateToken, (req, res) => {
-  const jobId = parseInt(req.params.id);
-  const { role, company, description, status } = req.body;
-
-  const job = jobs.find(j => j.id === jobId);
-  if (!job) return res.status(404).json({ error: "Job not found" });
-
-  job.role = role ?? job.role;
-  job.company = company ?? job.company;
-  job.description = description ?? job.description;
-  job.status = status ?? job.status;
-
-  res.json(job);
-});
-
 
 app.listen(PORT, () => console.log(`Auth server running on http://localhost:${PORT}`));

@@ -2,16 +2,46 @@ import React, { useState } from "react";
 
 const JobTable = ({ jobs, onUpdateJob, onDeleteJob }) => {
   const [editId, setEditId] = useState(null);
-  const [editJob, setEditJob] = useState({ role: "", company: "", description: "", status: "" });
+  const [editJob, setEditJob] = useState({
+    id: null, // include id
+    role: "",
+    company: "",
+    description: "",
+    status: "Open",
+    location: "",
+    job_type: "",
+    salary: "",
+    tags: ""
+  });
 
   const startEdit = (job) => {
     setEditId(job.id);
-    setEditJob({ ...job });
+    setEditJob({
+      id: job.id,
+      role: job.role || "",
+      company: job.company || "",
+      description: job.description || "",
+      status: job.status || "Open",
+      location: job.location || "",
+      job_type: job.job_type || "",
+      salary: job.salary || "",
+      tags: job.tags || ""
+    });
   };
 
   const cancelEdit = () => {
     setEditId(null);
-    setEditJob({ role: "", company: "", description: "", status: "" });
+    setEditJob({
+      id: null,
+      role: "",
+      company: "",
+      description: "",
+      status: "Open",
+      location: "",
+      job_type: "",
+      salary: "",
+      tags: ""
+    });
   };
 
   const handleChange = (e) => {
@@ -28,6 +58,10 @@ const JobTable = ({ jobs, onUpdateJob, onDeleteJob }) => {
             <th className="border border-gray-300 px-4 py-2">Role</th>
             <th className="border border-gray-300 px-4 py-2">Status</th>
             <th className="border border-gray-300 px-4 py-2">Description</th>
+            <th className="border border-gray-300 px-4 py-2">Location</th>
+            <th className="border border-gray-300 px-4 py-2">Job Type</th>
+            <th className="border border-gray-300 px-4 py-2">Salary</th>
+            <th className="border border-gray-300 px-4 py-2">Tags</th>
             <th className="border border-gray-300 px-4 py-2">Actions</th>
           </tr>
         </thead>
@@ -37,18 +71,10 @@ const JobTable = ({ jobs, onUpdateJob, onDeleteJob }) => {
               {editId === job.id ? (
                 <>
                   <td className="border border-gray-300 px-4 py-2">
-                    <input
-                      name="company"
-                      value={editJob.company}
-                      onChange={handleChange}
-                    />
+                    <input name="company" value={editJob.company} onChange={handleChange} />
                   </td>
                   <td className="border border-gray-300 px-4 py-2">
-                    <input
-                      name="role"
-                      value={editJob.role}
-                      onChange={handleChange}
-                    />
+                    <input name="role" value={editJob.role} onChange={handleChange} />
                   </td>
                   <td className="border border-gray-300 px-4 py-2">
                     <select name="status" value={editJob.status} onChange={handleChange}>
@@ -58,24 +84,48 @@ const JobTable = ({ jobs, onUpdateJob, onDeleteJob }) => {
                     </select>
                   </td>
                   <td className="border border-gray-300 px-4 py-2">
-                    <input
-                      name="description"
-                      value={editJob.description}
-                      onChange={handleChange}
-                    />
+                    <input name="description" value={editJob.description} onChange={handleChange} />
                   </td>
                   <td className="border border-gray-300 px-4 py-2">
-                    <button onClick={() => { onUpdateJob(editJob); cancelEdit(); }}>Save</button>
+                    <input name="location" value={editJob.location} onChange={handleChange} />
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    <input name="job_type" value={editJob.job_type} onChange={handleChange} />
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    <input name="salary" value={editJob.salary} onChange={handleChange} />
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    <input name="tags" value={editJob.tags} onChange={handleChange} />
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2 space-x-1">
+                    <button
+                      onClick={() => {
+                        // Split the comma-separated string into an array, or set to null if empty
+                        const tagsArray = editJob.tags
+                          ? editJob.tags.split(",").map((tag) => tag.trim())
+                          : null;
+
+                        onUpdateJob({ ...editJob, tags: tagsArray });
+                        cancelEdit();
+                      }}
+                    >
+                      Save
+                    </button>
                     <button onClick={cancelEdit}>Cancel</button>
                   </td>
                 </>
               ) : (
                 <>
-                  <td className="border border-gray-300 px-4 py-2">{job.company}</td>
-                  <td className="border border-gray-300 px-4 py-2">{job.role}</td>
-                  <td className="border border-gray-300 px-4 py-2">{job.status}</td>
-                  <td className="border border-gray-300 px-4 py-2">{job.description}</td>
-                  <td className="border border-gray-300 px-4 py-2">
+                  <td className="border border-gray-300 px-4 py-2">{job.company || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.role || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.status || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.description || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.location || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.job_type || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.salary || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2">{job.tags || ""}</td>
+                  <td className="border border-gray-300 px-4 py-2 space-x-1">
                     <button onClick={() => startEdit(job)}>Edit</button>
                     <button onClick={() => onDeleteJob(job.id)}>Delete</button>
                   </td>

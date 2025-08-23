@@ -4,11 +4,17 @@ import JobTable from "./components/JobTable";
 
 export default function JobsPage({ setToken }) {
   const [jobs, setJobs] = useState([]);
+
+  // Fields for posting a job
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [description, setDescription] = useState("");
-  const navigate = useNavigate();
+  const [location, setLocation] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [salary, setSalary] = useState("");
+  const [tags, setTags] = useState("");
 
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -42,14 +48,29 @@ export default function JobsPage({ setToken }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ role: title, company, description, status: "Open" }),
+        body: JSON.stringify({
+          role: title || "",
+          company: company || "",
+          description: description || "",
+          status: "Open",
+          location: location || "",
+          job_type: jobType || "",
+          salary: salary || "",
+          tags: tags || ""
+        }),
       });
       if (!res.ok) throw new Error("Failed to post job");
       const newJob = await res.json();
       setJobs([...jobs, newJob]);
+
+      // Clear form
       setTitle("");
       setCompany("");
       setDescription("");
+      setLocation("");
+      setJobType("");
+      setSalary("");
+      setTags("");
     } catch (err) {
       console.error(err);
     }
@@ -57,13 +78,25 @@ export default function JobsPage({ setToken }) {
 
   const handleUpdateJob = async (updatedJob) => {
     try {
+      // Only send fields that are defined
+      const body = {
+        role: updatedJob.role || "",
+        company: updatedJob.company || "",
+        description: updatedJob.description || "",
+        status: updatedJob.status || "Open",
+        location: updatedJob.location || "",
+        job_type: updatedJob.job_type || "",
+        salary: updatedJob.salary || "",
+        tags: updatedJob.tags || ""
+      };
+
       const res = await fetch(`http://localhost:4000/jobs/${updatedJob.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updatedJob),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Failed to update job");
       const data = await res.json();
@@ -90,7 +123,9 @@ export default function JobsPage({ setToken }) {
     <div>
       <h2>Job Board</h2>
       <button onClick={handleLogout}>Logout</button>
-      <form onSubmit={handlePostJob}>
+
+      {/* Job Posting Form */}
+      <form onSubmit={handlePostJob} className="space-y-2">
         <input
           type="text"
           placeholder="Job Title"
@@ -110,10 +145,36 @@ export default function JobsPage({ setToken }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        <input
+          type="text"
+          placeholder="Location"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Job Type"
+          value={jobType}
+          onChange={(e) => setJobType(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Salary"
+          value={salary}
+          onChange={(e) => setSalary(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Tags (comma-separated)"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+        />
         <button type="submit">Post Job</button>
       </form>
+
+      {/* Job Table */}
       <JobTable
-        jobs={jobs}
+        jobs={jobs || []} // ensure jobs is always an array
         onUpdateJob={handleUpdateJob}
         onDeleteJob={handleDeleteJob}
       />
