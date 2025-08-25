@@ -27,33 +27,71 @@ const users = [];
 
 // --- Routes ---
 
-app.get('/users', (req, res) => {
-  res.json(users);
+app.get('/users', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, email, created_at FROM users');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Signup
+// Signup
 app.post('/signup', async (req, res) => {
   const { email, password } = req.body;
-  const userExists = users.find(u => u.email === email);
-  if (userExists) return res.status(400).json({ error: 'User already exists' });
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-  users.push({ email, password: hashedPassword });
-  res.status(201).json({ message: 'User created' });
+  if (!email || !password)
+    return res.status(400).json({ error: 'Email and password required' });
+
+  try {
+    // Check if user already exists
+    const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0)
+      return res.status(400).json({ error: 'User already exists' });
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert new user into DB
+    const result = await pool.query(
+      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, created_at',
+      [email, hashedPassword]
+    );
+
+    res.status(201).json({ message: 'User created', user: result.rows[0] });
+  } catch (err) {
+    console.error('Signup error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
+
 
 // Login
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = users.find(u => u.email === email);
-  if (!user) return res.status(400).json({ error: 'Invalid credentials' });
 
-  const validPassword = await bcrypt.compare(password, user.password);
-  if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
+  try {
+    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0)
+      return res.status(400).json({ error: 'Invalid credentials' });
 
-  const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
-  res.json({ token });
+    const user = userResult.rows[0];
+
+    // Compare password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
+
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
+
 
 // GET all jobs
 app.get("/jobs", authenticateToken, async (req, res) => {
