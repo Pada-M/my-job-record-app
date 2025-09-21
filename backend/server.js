@@ -22,22 +22,7 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory users (you can later move users to DB)
-const users = [];
 
-// --- Routes ---
-
-app.get('/users', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, email, created_at FROM users');
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-// Signup
 // Signup
 app.post('/signup', async (req, res) => {
   const { email, password } = req.body;
@@ -96,7 +81,7 @@ app.post('/login', async (req, res) => {
 // GET all jobs
 app.get("/jobs", authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM jobs");
+    const result = await pool.query("SELECT * FROM jobs WHERE user_id = $1", [req.user.id]);
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching jobs:", err);
@@ -112,13 +97,12 @@ app.post("/jobs", authenticateToken, async (req, res) => {
 
     if (!role || !company) return res.status(400).json({ error: "Role and company required" });
 
-    const query = `
-      INSERT INTO jobs (role, company, description, status, location, job_type, salary, tags)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *;
-    `;
-    const values = [role, company, description || null, status || "Open", location || null, job_type || null, salary || null, tags || null];
+    const result = await pool.query(
+      `INSERT INTO jobs (role, company, description, status, location, job_type, salary, tags, user_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *;`,
+      [role, company, description || null, status || "Open", location || null, job_type || null, salary || null, tags || null, req.user.id]
+    );
 
-    const result = await pool.query(query, values);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Error posting job:", err);
@@ -174,17 +158,22 @@ app.patch('/jobs/:id', authenticateToken, async (req, res) => {
 
 
 
-// DELETE a job
 app.delete('/jobs/:id', authenticateToken, async (req, res) => {
   const jobId = parseInt(req.params.id);
   try {
-    const result = await pool.query("DELETE FROM jobs WHERE id=$1 RETURNING *", [jobId]);
+    const result = await pool.query(
+      "DELETE FROM jobs WHERE id=$1 AND user_id=$2 RETURNING *;",
+      [jobId, req.user.id] // ✅ use jobId here
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
 
     res.json(result.rows[0]);
+    
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Error deleting job:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 app.listen(PORT, () => console.log(`Auth server running on http://localhost:${PORT}`));

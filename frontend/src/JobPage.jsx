@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import useAuth from "./hooks/useAuth";
 import JobTable from "./components/JobTable";
 
-export default function JobsPage({ setToken }) {
+export default function JobsPage() {
   const [jobs, setJobs] = useState([]);
 
-  // Fields for posting a job
+  // Job posting form state
   const [title, setTitle] = useState("");
   const [company, setCompany] = useState("");
   const [description, setDescription] = useState("");
@@ -14,30 +14,34 @@ export default function JobsPage({ setToken }) {
   const [salary, setSalary] = useState("");
   const [tags, setTags] = useState("");
 
-  const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  // useAuth returns [token, saveToken, handleLogout]
+  const [token, , handleLogout] = useAuth();
+  
 
+  // Fetch jobs
   useEffect(() => {
+    if (!token) return;
+
     const fetchJobs = async () => {
       try {
         const res = await fetch("http://localhost:4000/jobs", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error("Failed to fetch jobs");
+
+        if (!res.ok) {
+          handleLogout(); // invalid/expired token → logout
+          return;
+        }
+
         const data = await res.json();
         setJobs(data);
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching jobs:", err);
       }
     };
-    fetchJobs();
-  }, [token]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    setToken("");
-    navigate("/login");
-  };
+    fetchJobs();
+  }, [token, handleLogout]);
 
   const handlePostJob = async (e) => {
     e.preventDefault();
@@ -49,19 +53,20 @@ export default function JobsPage({ setToken }) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          role: title || "",
-          company: company || "",
-          description: description || "",
+          role: title,
+          company,
+          description,
           status: "Open",
-          location: location || "",
-          job_type: jobType || "",
-          salary: salary || "",
-          tags: tags || ""
+          location,
+          job_type: jobType,
+          salary,
+          tags,
         }),
       });
+
       if (!res.ok) throw new Error("Failed to post job");
       const newJob = await res.json();
-      setJobs([...jobs, newJob]);
+      setJobs((prev) => [...prev, newJob]);
 
       // Clear form
       setTitle("");
@@ -72,37 +77,26 @@ export default function JobsPage({ setToken }) {
       setSalary("");
       setTags("");
     } catch (err) {
-      console.error(err);
+      console.error("Error posting job:", err);
     }
   };
 
   const handleUpdateJob = async (updatedJob) => {
     try {
-      // Only send fields that are defined
-      const body = {
-        role: updatedJob.role || "",
-        company: updatedJob.company || "",
-        description: updatedJob.description || "",
-        status: updatedJob.status || "Open",
-        location: updatedJob.location || "",
-        job_type: updatedJob.job_type || "",
-        salary: updatedJob.salary || "",
-        tags: updatedJob.tags || ""
-      };
-
       const res = await fetch(`http://localhost:4000/jobs/${updatedJob.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(updatedJob),
       });
+
       if (!res.ok) throw new Error("Failed to update job");
       const data = await res.json();
-      setJobs(jobs.map((job) => (job.id === data.id ? data : job)));
+      setJobs((prev) => prev.map((job) => (job.id === data.id ? data : job)));
     } catch (err) {
-      console.error(err);
+      console.error("Error updating job:", err);
     }
   };
 
@@ -112,10 +106,11 @@ export default function JobsPage({ setToken }) {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (!res.ok) throw new Error("Failed to delete job");
-      setJobs(jobs.filter((job) => job.id !== id));
+      setJobs((prev) => prev.filter((job) => job.id !== id));
     } catch (err) {
-      console.error(err);
+      console.error("Error deleting job:", err);
     }
   };
 
@@ -126,58 +121,18 @@ export default function JobsPage({ setToken }) {
 
       {/* Job Posting Form */}
       <form onSubmit={handlePostJob} className="space-y-2">
-        <input
-          type="text"
-          placeholder="Job Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Company"
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          required
-        />
-        <textarea
-          placeholder="Description..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Location"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Job Type"
-          value={jobType}
-          onChange={(e) => setJobType(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Salary"
-          value={salary}
-          onChange={(e) => setSalary(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Tags (comma-separated)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
+        <input type="text" placeholder="Job Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        <input type="text" placeholder="Company" value={company} onChange={(e) => setCompany(e.target.value)} required />
+        <textarea placeholder="Description..." value={description} onChange={(e) => setDescription(e.target.value)} />
+        <input type="text" placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+        <input type="text" placeholder="Job Type" value={jobType} onChange={(e) => setJobType(e.target.value)} />
+        <input type="text" placeholder="Salary" value={salary} onChange={(e) => setSalary(e.target.value)} />
+        <input type="text" placeholder="Tags (comma-separated)" value={tags} onChange={(e) => setTags(e.target.value)} />
         <button type="submit">Post Job</button>
       </form>
 
       {/* Job Table */}
-      <JobTable
-        jobs={jobs || []} // ensure jobs is always an array
-        onUpdateJob={handleUpdateJob}
-        onDeleteJob={handleDeleteJob}
-      />
+      <JobTable jobs={jobs} onUpdateJob={handleUpdateJob} onDeleteJob={handleDeleteJob} />
     </div>
   );
 }
